@@ -1,0 +1,20 @@
+{
+  "name": "dns-ai",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "nodemon": "^3.1.9"
+  },
+  "dependencies": {
+    "dns-packet": "^5.6.1"
+  }
+}
