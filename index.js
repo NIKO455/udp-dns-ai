@@ -1,57 +1,33 @@
-import dgram from "node:dgram";
-import dnsPacket from "dns-packet";
+import "dotenv/config.js";
+import { createResponse, createTxtAnswer, startUdpServer } from "denamed";
+import { generateContent } from "./ai/generate.js";
+import { db } from "./db/db.js";
 
-const server = dgram.createSocket("udp4");
+startUdpServer(
+  async (query) => {
+    const question = query.questions[0];
 
-const db = {
-  "google.com": {
-    type: "A",
-    data: "1.2.4.5.",
+    if (question.type !== "TXT") {
+      return createResponse(query, [
+        createTxtAnswer(question, "Type must be TXT"),
+      ]);
+    }
+
+    if (question.name.startsWith("ai:")) {
+      const createPrompt = question.name.split(".").join(" ");
+      const result = await generateContent(createPrompt);
+      return createResponse(query, [createTxtAnswer(question, result)]);
+    }
+
+    if (!db[question.name]) {
+      return createResponse(query, [
+        createTxtAnswer(question, "Please re-check your domain!"),
+      ]);
+    }
+
+    return createResponse(query, [
+      createTxtAnswer(question, db[question.name].data),
+    ]);
   },
-  "facebook.com": {
-    type: "A",
-    data: "3.3.3.2",
-  },
-};
-
-server.on("error", (err) => {
-  console.log("Error: ", err);
-  server.close();
-});
-
-server.on("message", (message, rinfo) => {
-  const incomingRequest = dnsPacket.decode(message);
-  const ipFromDb = db[incomingRequest.questions[0].name];
-
-  if (!ipFromDb) {
-    return server.send(message, rinfo.port, rinfo.address);
-  }
-
-  const ans = dnsPacket.encode({
-    type: "response",
-    id: incomingRequest.id,
-    flags: dnsPacket.AUTHORITATIVE_ANSWER,
-    questions: incomingRequest.questions,
-    answers: [
-      {
-        type: ipFromDb.type,
-        class: "IN",
-        name: incomingRequest.questions[0].name,
-        data: ipFromDb.data,
-      },
-    ],
-  });
-
-  server.send(ans, rinfo.port, rinfo.address);
-});
-
-server.on("listening", () => {
-  const address = server.address();
-  console.log(
-    `Server listing on ${address.address} address and port ${address.port}`,
-  );
-});
-
-server.bind(5300, () => {
-  console.log(`Binded to port no ${5300}`);
-});
+  { port: process.env.PORT || 5300 },
+);
